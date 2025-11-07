@@ -1,5 +1,6 @@
 import os
 from datetime import datetime 
+from langchain_openai import ChatOpenAI
 
 LOG_DIRECTORY = "memory/session_logs"
 os.makedirs(LOG_DIRECTORY, exist_ok=True)
@@ -25,3 +26,18 @@ def read_session_log():
 
 session_log = read_session_log()
 print(session_log)
+
+def summarise_session_log(query): 
+    raw = read_session_log()
+
+    prompt = f"""
+        You are Nova. Read the following text and extract a bullet-point summary for each invidividual task for today:
+
+        {raw}
+
+        Return only the summary.
+        """
+    
+    summary =  ChatOpenAI(model="gpt-3.5-turbo-1106").invoke(prompt)
+
+    return summary.content

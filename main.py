@@ -4,7 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 
-from langchain.memory import ChatMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 from elevenlabs.client import ElevenLabs
 from elevenlabs import play
@@ -14,8 +14,9 @@ import os
 import requests
 
 import tempfile
+import subprocess
 from pydub import AudioSegment
-from pydub.playback import play as play_audio
+# Note: Removed pydub.playback to avoid segfaults on macOS
 
 from memory.memory_manager import retrieve_memory, save_memory
 from memory.session_logger import log_session_note, read_session_log
@@ -91,9 +92,6 @@ def get_response(input_text, session_id="default_session"):
     ):
         if chunk.content: 
             yield chunk.content
-
-    
-    
 def summarise_session_log(query): 
     raw = read_session_log()
 
@@ -161,9 +159,9 @@ def get_voice_message(message):
             f.write(audio)
             temp_filename = f.name
 
-        sound = AudioSegment.from_mp3(temp_filename)
-        play_audio(sound)
-
+        # Use macOS's afplay instead of pydub.playback to avoid segfaults
+        subprocess.run(['afplay', temp_filename], check=True)
+        
         os.unlink(temp_filename)
 
         return True
@@ -250,10 +248,12 @@ def yield_message(msg):
 
 
 if __name__ == "__main__":
-    # Test the function
-    response = get_response('Say hi to my friend Jenny')
-    print('Response', response)
-    get_voice_message(response)
+    # Test the function (commented out to avoid automatic execution)
+    # response = get_response('Say hi to my friend Jenny')
+    # print('Response', response)
+    # get_voice_message(response)
+    print("✨ Nova Assistant Ready!")
+    print("💡 Run 'python chat.py' for interactive conversation")
 
 
     

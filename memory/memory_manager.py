@@ -1,7 +1,11 @@
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
+from dotenv import find_dotenv, load_dotenv
 import os
+
+# Load environment variables first
+load_dotenv(find_dotenv())
 
 CHROMA_DIR = "memory/chroma_db"
 
