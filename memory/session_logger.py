@@ -24,16 +24,21 @@ def read_session_log():
     else: 
         print('No logs exist')
 
-session_log = read_session_log()
-print(session_log)
-
 def summarise_session_log(query): 
     raw = read_session_log()
+
+    if not raw: 
+        return "No logs for today."
+
+    # if query: 
+    #     [line for line in raw if any(word in line,)]
 
     prompt = f"""
         You are Nova. Read the following text and extract a bullet-point summary for each invidividual task for today:
 
         {raw}
+        Your summary should address the query if provided.
+        If no query is provided, summarise all tasks for today
 
         Return only the summary.
         """

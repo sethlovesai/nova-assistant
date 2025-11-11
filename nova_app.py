@@ -2,11 +2,16 @@
 import streamlit as st
 import time
 import numpy as np
+import soundfile as sf
 import sounddevice as sd
 from scipy.io.wavfile import write
 import tempfile
 import os
 from nova import initialize_whisper, transcribe_audio, chat_with_nova, speak_text
+from nova2 import NovaAssistant
+
+from streamlit_mic_recorder import mic_recorder
+import io
 
 # Page configuration
 st.set_page_config(
@@ -122,15 +127,17 @@ if 'nova_initialized' not in st.session_state:
 if 'recording' not in st.session_state:
     st.session_state.recording = False
 
+nova = NovaAssistant()
+
 def init_nova():
     """Initialize Nova system"""
     if not st.session_state.nova_initialized:
-        with st.spinner("🌟 Nova is initializing..."):
+        with st.spinner(" Nova is initializing..."):
             if initialize_whisper():
                 st.session_state.nova_initialized = True
                 return True
             else:
-                st.error("❌ Failed to initialize Nova")
+                st.error(" Failed to initialize Nova")
                 return False
     return True
 
@@ -146,6 +153,27 @@ def record_audio(duration=5, sample_rate=16000):
     except Exception as e:
         st.error(f"Recording error: {e}")
         return None, None
+
+def record_push_to_talk():
+
+    audio = mic_recorder(
+                start_prompt="Start recording",
+                stop_prompt="Stop recording",
+                just_once=False,
+                use_container_width=False,
+                key="nova_ptt"
+            )
+
+    if audio:
+        wav_bytes = audio["bytes"]         # WAV mono bytes
+        sr = audio.get("sample_rate", None)       # browser-provided sample rate (often 48k)
+        st.audio(wav_bytes, format="audio/wav")
+
+        data = np.frombuffer(wav_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+        return data, sr 
+
+    return None, None
 
 def add_message(role, content):
     """Add message to conversation"""
@@ -186,12 +214,11 @@ def handle_user_input(user_input):
         
         # Get Nova's response
         with st.spinner("🤖 Nova is thinking..."):
-            response = chat_with_nova(user_input)
+            response = nova.speak_with_nova(user_input)
             add_message('nova', response)
             
-            # Speak response
             try:
-                speak_text(response)
+                nova.speak(response)
             except Exception as e:
                 st.warning(f"Could not play audio: {e}")
         
@@ -201,8 +228,7 @@ def main():
     # Header
     st.markdown("""
     <div class="nova-header">
-        <div class="nova-title">🌟 Nova Assistant</div>
-        <div class="nova-subtitle">Your intelligent voice and text companion</div>
+        <div class="nova-title">Nova</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -213,61 +239,56 @@ def main():
     # Status
     st.markdown("""
     <div class="status-box status-ready">
-        ✅ Nova is ready to assist you!
+        Nova is initialised.
     </div>
     """, unsafe_allow_html=True)
     
     # Voice Controls
-    st.markdown("## 🎤 Voice Input")
-    
-    voice_col1, voice_col2 = st.columns([1, 1])
-    
-    with voice_col1:
-        duration = st.selectbox("Recording Duration", [3, 5, 8, 10], index=1)
-    
-    with voice_col2:
-        if st.button("🎙️ Record Voice Message", use_container_width=True):
-            # Show recording status
-            status_placeholder = st.empty()
-            status_placeholder.markdown(f"""
-            <div class="status-box status-recording">
-                🔴 Recording for {duration} seconds... Speak now!
-            </div>
-            """, unsafe_allow_html=True)
+    st.markdown("## Talk to Nova")
+
+
+    if st.button(" Speak", use_container_width=True):
+        # Show recording status
+        status_placeholder = st.empty()
+        status_placeholder.markdown(f"""
+        <div class="status-box status-recording">
+                Speaking with Nova
+        </div>
+        """, unsafe_allow_html=True)
+        nova.run_nova()
+        # Record audio
+        # audio, sr = record_audio()            
+        # if audio is not None:
+        #     status_placeholder.markdown("""
+        #     <div class="status-box">
+        #          Processing your voice...
+        #     </div>
+        #     """, unsafe_allow_html=True)
             
-            # Record audio
-            audio, sr = record_audio(duration=duration)
+        #     # Transcribe
+        #     user_input = transcribe_audio(audio, sr)
+        #     # user_input = transcribe_audio(data, sr_loaded)  # use your current function
             
-            if audio is not None:
-                status_placeholder.markdown("""
-                <div class="status-box">
-                    🔄 Processing your voice...
-                </div>
-                """, unsafe_allow_html=True)
+        #     if user_input:
+        #         status_placeholder.markdown(f"""
+        #         <div class="status-box status-ready">
+        #              Heard: "{user_input}"
+        #         </div>
+        #         """, unsafe_allow_html=True)
                 
-                # Transcribe
-                user_input = transcribe_audio(audio, sr)
-                
-                if user_input:
-                    status_placeholder.markdown(f"""
-                    <div class="status-box status-ready">
-                        ✅ Heard: "{user_input}"
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Process the input
-                    handle_user_input(user_input)
-                else:
-                    status_placeholder.markdown("""
-                    <div class="status-box">
-                        ⚠️ Could not understand the audio. Please try again.
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                status_placeholder.empty()
-    
+        #         # Process the input
+        #         handle_user_input(user_input)
+        #     else:
+        #         status_placeholder.markdown("""
+        #         <div class="status-box">
+        #              Could not understand the audio. Please try again.
+        #         </div>
+        #         """, unsafe_allow_html=True)
+        # else:
+        #     status_placeholder.empty()
+
     # Text Input
-    st.markdown("## 💬 Text Input")
+    st.markdown("## Chat with Nova")
     
     with st.form("text_form", clear_on_submit=True):
         text_input = st.text_area(
@@ -276,12 +297,12 @@ def main():
             height=100
         )
         
-        submitted = st.form_submit_button("📤 Send Message", use_container_width=True)
+        submitted = st.form_submit_button("Enter", use_container_width=True)
         
         if submitted and text_input:
             handle_user_input(text_input)
 
-    st.markdown("## 💭 Conversation")
+    st.markdown("## Conversation History")
     display_conversation()
     
     # Footer

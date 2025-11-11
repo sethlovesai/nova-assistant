@@ -1,0 +1,13 @@
+python-dotenv==1.0.1
+openai
+requests==2.32.3
+pydub==0.25.1
+simpleaudio==1.0.4
+sounddevice==0.4.7
+soundfile==0.12.1
+webrtcvad==2.0.10
+openai-whisper
+elevenlabs
+chromadb 
+langchain
+langchain-community

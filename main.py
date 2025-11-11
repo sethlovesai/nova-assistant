@@ -92,6 +92,7 @@ def get_response(input_text, session_id="default_session"):
     ):
         if chunk.content: 
             yield chunk.content
+            
 def summarise_session_log(query): 
     raw = read_session_log()
 
